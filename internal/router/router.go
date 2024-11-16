@@ -3,7 +3,6 @@ package router
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/muandane/estrois/internal/config"
 	"github.com/muandane/estrois/internal/handlers"
@@ -25,14 +24,12 @@ func NewRouter(logger *slog.Logger) *Router {
 func (r *Router) Setup(objectHandler *handlers.ObjectHandler) http.Handler {
 	// Create middleware instances
 	validationConfig := middleware.ValidationConfig{
-		MaxKeyLength:   1024,
-		AllowedBuckets: strings.Split(config.GetAllowedBuckets().AllowedBuckets, ","),
-		AllowedFileTypes: []string{
-			"image/jpeg",
-			"image/png",
-			"application/pdf",
+		ExcludedPaths: []string{
+			"/health",
+			"/metrics",
+			"/stats",
 		},
-		Enabled: config.GetBucketConfig().EnableBucketPolicies,
+		BucketAccess: config.GetAllowedBuckets().AllowedBuckets,
 	}
 
 	metricsMiddleware := middleware.NewMetricsMiddleware()
@@ -48,7 +45,7 @@ func (r *Router) Setup(objectHandler *handlers.ObjectHandler) http.Handler {
 	return middleware.Chain(
 		r.mux,
 		middleware.WithLogging(r.logger),
-		middleware.WithRequestValidation(validationConfig),
+		middleware.WithValidation(validationConfig),
 		metricsMiddleware.WithMetrics,
 	)
 }
