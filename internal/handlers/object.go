@@ -16,6 +16,7 @@ import (
 
 type ObjectHandler struct {
 	client *minio.Client
+	cache  *cache.Manager
 	logger *slog.Logger
 }
 
