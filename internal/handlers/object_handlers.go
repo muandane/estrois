@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -45,33 +44,12 @@ func PutObject(c *gin.Context) {
 		contentType = "application/octet-stream"
 	}
 
-	// Read body with a size limit to prevent memory exhaustion
-	maxSize := int64(50 * 1024 * 1024) // 50MB limit
-	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxSize))
+	body, err := processRequestBody(c)
 	if err != nil {
-		c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to read request body: %w", err))
+		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
+			_ = c.Error(err)
+		}
 		return
-	}
-
-	// Handle gzip decompression if needed
-	if c.GetHeader("Content-Encoding") == "gzip" {
-		gz, err := gzip.NewReader(bytes.NewReader(body))
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"error": fmt.Sprintf("invalid gzip data: %v", err),
-			})
-			return
-		}
-		defer gz.Close()
-
-		decompressed, err := io.ReadAll(gz)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"error": fmt.Sprintf("failed to decompress data: %v", err),
-			})
-			return
-		}
-		body = decompressed
 	}
 
 	// Upload to storage
@@ -104,7 +82,9 @@ func DeleteObject(c *gin.Context) {
 	// Delete from storage
 	err := storage.GetMinioClient().RemoveObject(context.Background(), bucket, key, minio.RemoveObjectOptions{})
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		if err := c.AbortWithError(http.StatusInternalServerError, err); err != nil {
+			_ = c.Error(err)
+		}
 		return
 	}
 
@@ -169,7 +149,11 @@ func serveFromCache(c *gin.Context, entry *cache.CacheEntry, acceptsGzip bool) {
 func serveFromStorage(c *gin.Context, bucket, key, cacheKey string, acceptsGzip bool) {
 	obj, err := storage.GetMinioClient().GetObject(context.Background(), bucket, key, minio.GetObjectOptions{})
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		if err := c.AbortWithError(http.StatusInternalServerError, err); err != nil {
+			if err := c.Error(err); err != nil {
+				_ = c.Error(err)
+			}
+		}
 		return
 	}
 
@@ -181,7 +165,9 @@ func serveFromStorage(c *gin.Context, bucket, key, cacheKey string, acceptsGzip 
 
 	data, err := io.ReadAll(obj)
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		if err := c.AbortWithError(http.StatusInternalServerError, err); err != nil {
+			_ = c.Error(err)
+		}
 		return
 	}
 
@@ -230,7 +216,9 @@ func handleStorageError(c *gin.Context, err error) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	c.AbortWithError(http.StatusInternalServerError, err)
+	if err := c.AbortWithError(http.StatusInternalServerError, err); err != nil {
+		_ = c.Error(err)
+	}
 }
 
 func setObjectHeaders(c *gin.Context, contentType string, size int64, lastModified time.Time, etag string) {

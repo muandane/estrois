@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/muandane/estrois/internal/storage"
@@ -24,6 +26,7 @@ func main() {
 	r.HEAD("/objects/:bucket/*key", handlers.HeadObject)
 	r.GET("/health", handlers.HealthCheck)
 
-	// Start server
-	r.Run()
+	if err := r.Run(); err != nil {
+		log.Fatalf("Failed to run server: %v", err)
+	}
 }
