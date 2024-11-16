@@ -1,0 +1,13 @@
+services:
+  server:
+    build:
+      context: .
+      target: final
+      x-bake:
+        tags:
+          - "muandane/estrois:${tag}"
+        platforms:
+          - linux/amd64
+          - linux/arm64
+    ports:
+      - 8080:8080

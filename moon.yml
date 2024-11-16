@@ -1,0 +1,34 @@
+type: 'tool'
+language: 'golang'
+
+project:
+  name: 'estrois'
+  description: 'A smoll s3 proxy server.'
+  channel: '#estrois'
+  owner: 'infra.platform'
+  maintainers: ['zine.moualhi']
+
+tasks:
+  dev:
+    command: 'go run main.go'
+    inputs:
+      - './*'
+  check:
+    command: 'go fmt ./... && go vet ./...'
+    options: 
+      runInCI: true
+  build:
+    command: 'go build -o estrois'
+    inputs:
+      - './*'
+    outputs:
+      - './estrois'
+    options: 
+      runInCI: true
+  docker-build:
+    command: 'docker buildx bake --push'
+    # deps:
+    #   - 'check'
+    options: 
+      runInCI: true
+
