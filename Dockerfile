@@ -8,7 +8,7 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
 ARG TARGETARCH
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
-    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server .
+    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server ./cmd/server/main.go
 
 FROM alpine:3.20.3 AS final
 

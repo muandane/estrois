@@ -18,7 +18,7 @@ tasks:
     options: 
       runInCI: true
   build:
-    command: 'go build -o estrois'
+    command: 'go build -o estrois ./cmd/server/main.go'
     inputs:
       - './*'
     outputs:
