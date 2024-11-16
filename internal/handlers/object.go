@@ -238,19 +238,6 @@ func (h *ObjectHandler) handleHead(w http.ResponseWriter, r *http.Request, bucke
 	w.Header().Set("ETag", info.ETag)
 }
 
-func HealthHandler(w http.ResponseWriter, r *http.Request) {
-	logger := slog.Default()
-	start := time.Now()
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"healthy"}`))
-
-	logger.Info("health check completed",
-		"duration", time.Since(start).String(),
-		"remote_addr", r.RemoteAddr,
-	)
-}
-
 // Helper functions
 
 func serveFromCache(w http.ResponseWriter, entry *cache.CacheEntry, acceptsGzip bool) {
