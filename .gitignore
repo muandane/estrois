@@ -1,0 +1,7 @@
+/target
+/cdn_root
+/data
+itsela-avatar.avif
+docker/garage/*
+!docker/garage/garage.toml
+!docker/compose.yml
