@@ -11,6 +11,7 @@ services:
           - linux/arm64
     ports:
       - 8080:8080
+      
   garage:
     image: dxflrs/garage:v1.0.1
     network_mode: "host"

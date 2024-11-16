@@ -1,0 +1,7 @@
+# rust:
+#   version: '1.79.0'
+# node:
+#   version: '22.2.0'
+#   packageManager: 'pnpm'
+#   pnpm:
+#     version: '9.1.1'
