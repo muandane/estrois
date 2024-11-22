@@ -39,7 +39,12 @@ func (r *Router) Setup(objectHandler *handlers.ObjectHandler) http.Handler {
 	r.mux.Handle("/health", handlers.NewHealthHandler(r.logger))
 	r.mux.Handle("/metrics", metricsMiddleware)
 	r.mux.Handle("/stats", statsHandler)
-	r.mux.Handle("/objects/", http.StripPrefix("/objects/", objectHandler))
+	r.mux.HandleFunc("/objects/{bucket}/{key...}", func(w http.ResponseWriter, r *http.Request) {
+		bucket := r.PathValue("bucket")
+		key := r.PathValue("key")
+		r.URL.Path = bucket + "/" + key
+		objectHandler.ServeHTTP(w, r)
+	})
 
 	// Apply middleware chain
 	return middleware.Chain(

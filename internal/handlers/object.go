@@ -36,19 +36,14 @@ func NewObjectHandler(client *minio.Client, logger *slog.Logger) (*ObjectHandler
 func (h *ObjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
-	segments := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(segments) < 2 {
-		http.Error(w, "invalid path", http.StatusBadRequest)
-		h.logger.Error("invalid path",
-			"path", r.URL.Path,
-			"method", r.Method,
-			"remote_addr", r.RemoteAddr,
-		)
+	// Use PathValue for extracting bucket and key
+	bucket := r.PathValue("bucket")
+	key := r.PathValue("key")
+
+	if bucket == "" || key == "" {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
-
-	bucket := segments[0]
-	key := strings.Join(segments[1:], "/")
 
 	logger := h.logger.With(
 		"method", r.Method,
@@ -68,9 +63,7 @@ func (h *ObjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodHead:
 		h.handleHead(w, r, bucket, key, logger)
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		logger.Error("method not allowed")
-		return
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 
 	logger.Info("request completed",
