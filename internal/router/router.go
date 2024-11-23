@@ -49,7 +49,7 @@ func (r *Router) Setup(objectHandler *handlers.ObjectHandler) http.Handler {
 	// Apply middleware chain
 	return middleware.Chain(
 		r.mux,
-		middleware.WithLogging(r.logger),
+		// middleware.WithLogging(r.logger),
 		middleware.WithValidation(validationConfig),
 		metricsMiddleware.WithMetrics,
 	)
