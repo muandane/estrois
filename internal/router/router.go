@@ -3,8 +3,8 @@ package router
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
+	"github.com/muandane/estrois/internal/config"
 	"github.com/muandane/estrois/internal/handlers"
 	"github.com/muandane/estrois/internal/middleware"
 )
@@ -22,25 +22,35 @@ func NewRouter(logger *slog.Logger) *Router {
 }
 
 func (r *Router) Setup(objectHandler *handlers.ObjectHandler) http.Handler {
-	// Register health check
-	healthHandler := handlers.NewHealthHandler(r.logger)
-	r.mux.Handle("/health", healthHandler)
+	// Create middleware instances
+	validationConfig := middleware.ValidationConfig{
+		ExcludedPaths: []string{
+			"/health",
+			"/metrics",
+			"/stats",
+		},
+		BucketAccess: config.GetAllowedBuckets().AllowedBuckets,
+	}
 
-	// Handle object routes
-	r.mux.HandleFunc("/objects/", func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/objects/")
-		if path == "" {
-			http.Error(w, "invalid path", http.StatusBadRequest)
-			return
-		}
-		r.URL.Path = "/" + path
+	metricsMiddleware := middleware.NewMetricsMiddleware()
+	statsHandler := handlers.NewStatsHandler()
+
+	// Register routes
+	r.mux.Handle("/health", handlers.NewHealthHandler(r.logger))
+	r.mux.Handle("/metrics", metricsMiddleware)
+	r.mux.Handle("/stats", statsHandler)
+	r.mux.HandleFunc("/objects/{bucket}/{key...}", func(w http.ResponseWriter, r *http.Request) {
+		bucket := r.PathValue("bucket")
+		key := r.PathValue("key")
+		r.URL.Path = bucket + "/" + key
 		objectHandler.ServeHTTP(w, r)
 	})
 
 	// Apply middleware chain
 	return middleware.Chain(
 		r.mux,
-		middleware.WithLogging(r.logger),
-		// Add more middleware here as needed
+		// middleware.WithLogging(r.logger),
+		middleware.WithValidation(validationConfig),
+		metricsMiddleware.WithMetrics,
 	)
 }

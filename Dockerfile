@@ -1,33 +1,25 @@
 ARG GO_VERSION=1.23.3
+
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
+
 WORKDIR /src
+
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \
     go mod download -x
+
 ARG TARGETARCH
+
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
-    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server ./cmd/server/main.go
+    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /bin/estrois ./cmd/server/main.go
 
-FROM alpine:3.20.3 AS final
+FROM cgr.dev/chainguard/static:latest AS final
 
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk --update add \
-        ca-certificates \
-        tzdata \
-        && \
-        update-ca-certificates
-ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    appuser
-USER appuser
-COPY --from=build /bin/server /bin/
+LABEL maintainer="muandane"
+USER nonroot:nonroot
+
+COPY --from=build --chown=nonroot:nonroot /bin/estrois /bin/
 EXPOSE 8080
-ENTRYPOINT [ "/bin/server" ]
+ENTRYPOINT [ "/bin/estrois" ]
