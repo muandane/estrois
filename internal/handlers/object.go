@@ -18,7 +18,7 @@ import (
 // ObjectHandler handles object storage operations
 type ObjectHandler struct {
 	client *minio.Client
-	cache  *cache.Manager
+	// cache  *cache.Manager
 	logger *slog.Logger
 }
 
@@ -108,29 +108,9 @@ func (h *ObjectHandler) routeRequest() http.HandlerFunc {
 }
 
 func (h *ObjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-
-	// Wrap the response writer to capture the status code and response size
 	rw := &responseWriter{ResponseWriter: w}
-
-	logger := h.logger.With(
-		"method", r.Method,
-		"bucket", r.PathValue("bucket"),
-		"key", r.PathValue("key"),
-		"remote_addr", r.RemoteAddr,
-		"user_agent", r.UserAgent(),
-	)
-
-	// Use the routing logic
 	handler := h.routeRequest()
 	handler(rw, r)
-
-	// Single, comprehensive log entry per request
-	logger.Info("request completed",
-		"status", rw.status,
-		"size", rw.size,
-		"duration", time.Since(start).String(),
-	)
 }
 
 func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetObjectRequest) (*Response, error) {
@@ -146,24 +126,22 @@ func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetOb
 
 	// Check cache
 	if entry, found := cache.GetFromCache(cacheKey); found {
-		h.logger.Info("serving from cache",
-			"content_type", entry.ContentType,
-			"size", entry.Size,
-			"compressed", entry.IsCompressed,
-		)
-
-		responseData := entry.Data
-		headers := http.Header{
-			"Content-Type":   []string{entry.ContentType},
-			"Content-Length": []string{fmt.Sprintf("%d", len(responseData))}, // Use actual data length
-			"Last-Modified":  []string{entry.LastModified.UTC().Format(http.TimeFormat)},
-			"ETag":           []string{entry.ETag},
-		}
-
+		var responseData []byte
+		var contentEncoding string
 		if acceptsGzip && entry.IsCompressed && entry.CompressedData != nil {
 			responseData = entry.CompressedData
-			headers.Set("Content-Length", fmt.Sprintf("%d", len(responseData))) // Update for compressed size
-			headers.Set("Content-Encoding", "gzip")
+			contentEncoding = "gzip"
+		} else {
+			responseData = entry.Data
+			contentEncoding = ""
+		}
+
+		headers := http.Header{
+			"Content-Type":     []string{entry.ContentType},
+			"Content-Length":   []string{fmt.Sprintf("%d", len(responseData))},
+			"Last-Modified":    []string{entry.LastModified.UTC().Format(http.TimeFormat)},
+			"ETag":             []string{entry.ETag},
+			"Content-Encoding": []string{contentEncoding},
 		}
 
 		return &Response{

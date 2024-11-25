@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -153,6 +154,10 @@ func handleError(w http.ResponseWriter, logger *slog.Logger, err error) {
 }
 
 func sendResponse(w http.ResponseWriter, logger *slog.Logger, response interface{}) {
+	var statusCode int
+	var bodySize int
+	var contentType string
+
 	switch resp := response.(type) {
 	case *Response:
 		// Set custom headers
@@ -163,34 +168,66 @@ func sendResponse(w http.ResponseWriter, logger *slog.Logger, response interface
 		// Set content type
 		if resp.ContentType != "" {
 			w.Header().Set("Content-Type", resp.ContentType)
+			contentType = resp.ContentType
 		} else {
 			w.Header().Set("Content-Type", "application/json")
+			contentType = "application/json"
 		}
 
 		// Set status code
 		if resp.StatusCode != 0 {
 			w.WriteHeader(resp.StatusCode)
+			statusCode = resp.StatusCode
 		} else {
 			w.WriteHeader(http.StatusOK)
+			statusCode = http.StatusOK
 		}
 
 		// Write body based on type
 		switch body := resp.Body.(type) {
 		case []byte:
 			w.Write(body)
+			bodySize = len(body)
 		case string:
-			w.Write([]byte(body))
+			bodyBytes := []byte(body)
+			w.Write(bodyBytes)
+			bodySize = len(bodyBytes)
 		default:
 			if body != nil {
-				json.NewEncoder(w).Encode(body)
+				buf := &bytes.Buffer{}
+				encoder := json.NewEncoder(buf)
+				if err := encoder.Encode(body); err != nil {
+					logger.Error("failed to encode response", "error", err)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+				w.Write(buf.Bytes())
+				bodySize = buf.Len()
 			}
 		}
 	default:
-		// Default to JSON response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		statusCode = http.StatusOK
+
+		buf := &bytes.Buffer{}
+		encoder := json.NewEncoder(buf)
+		if err := encoder.Encode(response); err != nil {
+			logger.Error("failed to encode response", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		w.Write(buf.Bytes())
+		bodySize = buf.Len()
+		contentType = "application/json"
 	}
+
+	// Log the response details
+	logger.Info("response sent",
+		"status_code", statusCode,
+		"content_type", contentType,
+		"body_size", bodySize,
+	)
 }
 
 // Custom error types
