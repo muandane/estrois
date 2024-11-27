@@ -154,6 +154,7 @@ type CacheEntry struct {
 - `S3_ACCESS_KEY`: Access key for authentication (default: "minioadmin")
 - `S3_SECRET_KEY`: Secret key for authentication (default: "minioadmin")
 - `S3_USE_SSL`: Enable/disable SSL (default: "false")
+- `ALLOWED_BUCKETS`: Define allowed buckets and access permissions (default: "public:read,private:all,local:all")
 
 ### Dependencies
 
