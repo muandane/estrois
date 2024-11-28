@@ -90,8 +90,10 @@ func (h *ObjectHandler) routeRequest() http.HandlerFunc {
 		case http.MethodGet:
 			handler = Handle(h.handleGet, opts)
 		case http.MethodPut:
-			opts.DecodeBody = true
-			handler = Handle(h.handlePut, opts)
+			handler = Handle(h.handlePut, HandlerOptions{
+				Logger:     logger,
+				DecodeBody: false,
+			})
 		case http.MethodDelete:
 			handler = Handle(h.handleDelete, opts)
 		case http.MethodHead:
@@ -221,10 +223,25 @@ func (h *ObjectHandler) handlePut(ctx context.Context, req *Request, input PutOb
 	cacheKey := cache.GetCacheKey(bucket, key)
 	cache.DeleteFromCache(cacheKey)
 
-	data := input.Data
+	data := req.Body
+
 	contentType := input.ContentType
 	if contentType == "" {
-		contentType = "application/octet-stream"
+		contentType = http.DetectContentType(data)
+	}
+	if strings.Contains(contentType, "application/json") {
+		switch {
+		case strings.HasSuffix(key, ".avif"):
+			contentType = "image/avif"
+		case strings.HasSuffix(key, ".jpg") || strings.HasSuffix(key, ".jpeg"):
+			contentType = "image/jpeg"
+		case strings.HasSuffix(key, ".png"):
+			contentType = "image/png"
+		case strings.HasSuffix(key, ".gif"):
+			contentType = "image/gif"
+		case strings.HasSuffix(key, ".webp"):
+			contentType = "image/webp"
+		}
 	}
 
 	if input.ContentEncoding == "gzip" {

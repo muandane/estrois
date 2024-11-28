@@ -60,7 +60,7 @@ func Handle[T any, R any](handlerFunc HandlerFunc[T, R], opts HandlerOptions) ht
 		}
 
 		var input T
-		if opts.DecodeBody && len(req.Body) > 0 {
+		if opts.DecodeBody && len(req.Body) > 0 && r.Header.Get("Content-Type") == "application/json" {
 			if err := json.Unmarshal(req.Body, &input); err != nil {
 				sendError(w, logger, http.StatusBadRequest, "failed to decode request body", err)
 				return

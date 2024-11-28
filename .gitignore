@@ -6,5 +6,5 @@ docker/garage/*
 !docker/garage/garage.toml
 !docker/compose.yml
 .moon/cache
-.env
+.*.env
 httpie

@@ -19,6 +19,9 @@ type StorageConfig struct {
 func GetAllowedBuckets() *StorageConfig {
 	bucketAccess, err := parseBucketAccess(getEnv("ALLOWED_BUCKETS", "public:read,private:all,local:all"))
 	if err != nil {
+		log.Printf("Error parsing bucket access: %v", err)
+		log.Printf("Raw ALLOWED_BUCKETS value: %s", os.Getenv("ALLOWED_BUCKETS"))
+		log.Printf("Parsed Bucket Access: %+v", bucketAccess)
 		log.Fatal(err)
 	}
 	return &StorageConfig{
@@ -49,19 +52,19 @@ func getEnv(key, defaultValue string) string {
 }
 
 func parseBucketAccess(policy string) (map[string]string, error) {
-	bucketAccess := make(map[string]string)
-	pairs := strings.Split(policy, ",")
-	for _, pair := range pairs {
-		parts := strings.Split(pair, ":")
+	bucketAccessMap := make(map[string]string)
+	policyPairs := strings.Split(policy, ",")
+	for _, policyPair := range policyPairs {
+		parts := strings.Split(policyPair, ":")
 		if len(parts) != 2 {
 			return nil, errors.New("invalid bucket access policy format")
 		}
-		bucketName := strings.TrimSpace(parts[0])
-		accessLevel := strings.TrimSpace(parts[1])
-		if bucketName == "" || accessLevel == "" {
+		bucket := strings.TrimSpace(parts[0])
+		access := strings.TrimSpace(parts[1])
+		if bucket == "" || access == "" {
 			return nil, errors.New("bucket name or access level cannot be empty")
 		}
-		bucketAccess[bucketName] = accessLevel
+		bucketAccessMap[bucket] = access
 	}
-	return bucketAccess, nil
+	return bucketAccessMap, nil
 }
