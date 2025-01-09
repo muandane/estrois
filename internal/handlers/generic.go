@@ -26,6 +26,7 @@ type Response struct {
 	Headers     http.Header
 	Body        interface{}
 	ContentType string
+	IsStreaming bool
 }
 
 // HandlerFunc is the generic handler function type

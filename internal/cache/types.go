@@ -18,7 +18,7 @@ type CacheEntry struct {
 // Cache configuration
 const (
 	DefaultCacheDuration  = 5 * time.Minute
-	MaxCacheSize          = 100 * 1024 * 1024 // 100MB
+	MaxCacheSize          = 300 * 1024 * 1024 // 300MB
 	CleanupInterval       = 1 * time.Minute
-	MinSizeForCompression = 1024 // Only compress files larger than 1KB
+	MinSizeForCompression = 1 * 1024 * 1024 // Only compress files larger than 1MB
 )

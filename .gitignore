@@ -8,3 +8,4 @@ docker/garage/*
 .moon/cache
 .*.env
 httpie
+.DS_Store

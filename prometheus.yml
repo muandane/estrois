@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s  # How often to scrape targets
+
+scrape_configs:
+  - job_name: 'estrois'  # Job name for your app's metrics
+    static_configs:
+      - targets: ['estrois:8080']  # Use service name and port from Docker Compose

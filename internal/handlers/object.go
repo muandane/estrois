@@ -118,7 +118,6 @@ func (h *ObjectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetObjectRequest) (*Response, error) {
 	bucket := req.PathParams["bucket"]
 	key := req.PathParams["key"]
-
 	if bucket == "" || key == "" {
 		return nil, &ValidationError{Field: "path", Message: "invalid bucket or key"}
 	}
@@ -126,7 +125,7 @@ func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetOb
 	cacheKey := cache.GetCacheKey(bucket, key)
 	acceptsGzip := strings.Contains(req.Headers.Get("Accept-Encoding"), "gzip")
 
-	// Check cache
+	// Fast path: Check cache
 	if entry, found := cache.GetFromCache(cacheKey); found {
 		var responseData []byte
 		var contentEncoding string
@@ -135,31 +134,29 @@ func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetOb
 			contentEncoding = "gzip"
 		} else {
 			responseData = entry.Data
-			contentEncoding = ""
-		}
-
-		headers := http.Header{
-			"Content-Type":     []string{entry.ContentType},
-			"Content-Length":   []string{fmt.Sprintf("%d", len(responseData))},
-			"Last-Modified":    []string{entry.LastModified.UTC().Format(http.TimeFormat)},
-			"ETag":             []string{entry.ETag},
-			"Content-Encoding": []string{contentEncoding},
 		}
 
 		return &Response{
-			StatusCode:  http.StatusOK,
-			Headers:     headers,
+			StatusCode: http.StatusOK,
+			Headers: http.Header{
+				"Content-Type":     []string{entry.ContentType},
+				"Content-Length":   []string{fmt.Sprintf("%d", len(responseData))},
+				"Last-Modified":    []string{entry.LastModified.UTC().Format(http.TimeFormat)},
+				"ETag":             []string{entry.ETag},
+				"Content-Encoding": []string{contentEncoding},
+				"X-Cache":          []string{"HIT"},
+			},
 			Body:        responseData,
 			ContentType: entry.ContentType,
 		}, nil
 	}
 
-	h.logger.Info("cache miss, fetching from storage")
-
+	// Get object stats first
 	obj, err := h.client.GetObject(ctx, bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err
 	}
+	defer obj.Close()
 
 	info, err := obj.Stat()
 	if err != nil {
@@ -169,7 +166,40 @@ func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetOb
 		return nil, err
 	}
 
-	// Read the entire object into memory
+	// For very large files, stream directly
+	if info.Size > cache.MaxCacheSize*2 {
+		h.logger.Info("large file detected, streaming response",
+			"size", info.Size,
+			"content_type", info.ContentType,
+		)
+		headers := http.Header{
+			"Content-Type":  []string{info.ContentType},
+			"Last-Modified": []string{info.LastModified.UTC().Format(http.TimeFormat)},
+			"ETag":          []string{info.ETag},
+			"X-Cache":       []string{"BYPASS"},
+		}
+
+		if acceptsGzip && cache.ShouldCompress(info.ContentType, info.Size) {
+			return &Response{
+				StatusCode:  http.StatusOK,
+				Headers:     headers,
+				Body:        obj,
+				ContentType: info.ContentType,
+				IsStreaming: true,
+			}, nil
+		}
+
+		headers.Set("Content-Length", fmt.Sprintf("%d", info.Size))
+		return &Response{
+			StatusCode:  http.StatusOK,
+			Headers:     headers,
+			Body:        obj,
+			ContentType: info.ContentType,
+			IsStreaming: true,
+		}, nil
+	}
+
+	// For smaller files, read into memory
 	data, err := io.ReadAll(obj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read object data: %w", err)
@@ -180,13 +210,18 @@ func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetOb
 		"content_type", info.ContentType,
 	)
 
-	// Cache the object
-	cache.AddToCache(cacheKey, data, info.ContentType, int64(len(data)), info.LastModified, info.ETag)
+	// Cache smaller files in a goroutine
+	if int64(len(data)) <= cache.MaxCacheSize/2 {
+		go func() {
+			cache.AddToCache(cacheKey, data, info.ContentType, int64(len(data)), info.LastModified, info.ETag)
+		}()
+	}
 
 	headers := http.Header{
 		"Content-Type":  []string{info.ContentType},
 		"Last-Modified": []string{info.LastModified.UTC().Format(http.TimeFormat)},
 		"ETag":          []string{info.ETag},
+		"X-Cache":       []string{"MISS"},
 	}
 
 	responseData := data
@@ -201,7 +236,6 @@ func (h *ObjectHandler) handleGet(ctx context.Context, req *Request, input GetOb
 		}
 	}
 
-	// Set Content-Length after compression decision
 	headers.Set("Content-Length", fmt.Sprintf("%d", len(responseData)))
 
 	return &Response{
