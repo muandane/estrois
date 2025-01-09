@@ -34,7 +34,6 @@ func main() {
 	logger := setupLogger()
 	slog.SetDefault(logger)
 	logger.Info("starting application")
-
 	// Initialize storage client
 	storage.InitMinioClient(config.GetStorageConfig())
 	logger.Info("storage client initialized")
