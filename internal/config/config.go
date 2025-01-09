@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -67,4 +68,13 @@ func parseBucketAccess(policy string) (map[string]string, error) {
 		bucketAccessMap[bucket] = access
 	}
 	return bucketAccessMap, nil
+}
+
+func GetEnvWithDefaultInt(key string, defaultValue int64) int64 {
+	if sizeStr := os.Getenv(key); sizeStr != "" {
+		if size, err := strconv.ParseInt(sizeStr, 10, 64); err == nil {
+			return size * 1024 * 1024
+		}
+	}
+	return defaultValue * 1024 * 1024
 }

@@ -1,6 +1,10 @@
 package cache
 
-import "time"
+import (
+	"time"
+
+	"github.com/muandane/estrois/internal/config"
+)
 
 // CacheEntry represents a cached object with metadata
 type CacheEntry struct {
@@ -18,7 +22,8 @@ type CacheEntry struct {
 // Cache configuration
 const (
 	DefaultCacheDuration  = 5 * time.Minute
-	MaxCacheSize          = 300 * 1024 * 1024 // 300MB
 	CleanupInterval       = 1 * time.Minute
 	MinSizeForCompression = 1 * 1024 * 1024 // Only compress files larger than 1MB
 )
+
+var MaxCacheSize = config.GetEnvWithDefaultInt("MAX_CACHE_SIZE", 300)
